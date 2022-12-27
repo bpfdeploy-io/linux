@@ -76,12 +76,13 @@ static int prog_load_cnt(int verdict, int val)
 
 void serial_test_cgroup_attach_multi(void)
 {
-	__u32 prog_ids[4], prog_cnt = 0, attach_flags, saved_prog_id;
+	__u32 prog_ids[5], prog_cnt = 0, attach_flags, saved_prog_id;
 	int cg1 = 0, cg2 = 0, cg3 = 0, cg4 = 0, cg5 = 0, key = 0;
 	DECLARE_LIBBPF_OPTS(bpf_prog_attach_opts, attach_opts);
 	int allow_prog[7] = {-1};
 	unsigned long long value;
 	__u32 duration = 0;
+	int link_fd = -1;
 	int i = 0;
 
 	for (i = 0; i < ARRAY_SIZE(allow_prog); i++) {
@@ -122,6 +123,25 @@ void serial_test_cgroup_attach_multi(void)
 				   BPF_F_ALLOW_MULTI),
 		  "fail_same_prog_attach_to_cg1", "unexpected success\n"))
 		goto err;
+
+	/* try to attach previously-attached prog via link API. */
+	if (!ASSERT_ERR(bpf_link_create(allow_prog[0], cg1, BPF_CGROUP_INET_EGRESS,
+					NULL),
+			"fail_same_prog_link_to_cg1"))
+		goto err;
+
+	/* try redundant link creation for same prog */
+	link_fd = bpf_link_create(allow_prog[1], cg1, BPF_CGROUP_INET_EGRESS, NULL);
+	if (!ASSERT_GE(link_fd, 0, "link attach prog1 to cg1"))
+		goto err;
+
+	if (!ASSERT_ERR(bpf_link_create(allow_prog[1], cg1, BPF_CGROUP_INET_EGRESS,
+					NULL),
+			"fail_same_prog1_link_to_cg1"))
+		goto err;
+
+	/* detach link */
+	close(link_fd);
 
 	if (CHECK(bpf_prog_attach(allow_prog[1], cg1, BPF_CGROUP_INET_EGRESS,
 				  BPF_F_ALLOW_MULTI),
