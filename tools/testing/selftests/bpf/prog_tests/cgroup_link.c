@@ -120,6 +120,7 @@ void serial_test_cgroup_link(void)
 	if (!ASSERT_OK_PTR(links[last_cg], "cg_attach"))
 		goto cleanup;
 
+	/* We have a test declaring this behavior as intended */
 	ping_and_check(cg_nr + 1, 0);
 
 	/* detach link */
