@@ -568,13 +568,21 @@ static struct bpf_prog_list *find_attach_entry(struct hlist_head *progs,
 		return hlist_entry(progs->first, typeof(*pl), node);
 	}
 
+	/* Disallow attaching same prog/link twice, mix raw attach with
+	 * link attach of same prog or link attach the same prog
+	 */
 	hlist_for_each_entry(pl, progs, node) {
-		if (prog && pl->prog == prog && prog != replace_prog)
-			/* disallow attaching the same prog twice */
-			return ERR_PTR(-EINVAL);
-		if (link && pl->link == link)
-			/* disallow attaching the same link twice */
-			return ERR_PTR(-EINVAL);
+		if (pl->prog) {
+			if ((prog && pl->prog == prog && prog != replace_prog) ||
+			    (link && pl->prog == link->link.prog))
+				return ERR_PTR(-EINVAL);
+		}
+		if (pl->link) {
+			if ((prog && pl->link->link.prog == prog && prog != replace_prog) ||
+			    (link && (pl->link == link ||
+				      pl->link->link.prog == link->link.prog)))
+				return ERR_PTR(-EINVAL);
+		}
 	}
 
 	/* direct prog multi-attach w/ replacement case */
